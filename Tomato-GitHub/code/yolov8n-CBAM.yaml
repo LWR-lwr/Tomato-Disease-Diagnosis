@@ -1,0 +1,57 @@
+# -*- coding: utf-8 -*-
+# YOLOv8n + CBAM 模型配置文件（唯一改进点：CBAM 注意力机制）
+#
+# 与官方 yolov8n.yaml 的唯一区别：
+#   在主干网络末端（SPPF 之后）插入 1 个 CBAM 模块，
+#   对 P5 高层语义特征做通道 + 空间双重注意力重标定，
+#   再送入颈部（FPN+PAN）与检测头。
+#
+# 说明：
+#   1. CBAM 的输入通道数 = 上一层 SPPF 的输出通道数。
+#      YOLOv8n 的 width_multiple = 0.25，SPPF 配置通道 1024
+#      经宽度缩放后为 make_divisible(1024 x 0.25, 8) = 256，
+#      所以这一行写 [256]。若换成 s/m/l/x 规模的骨干，需同步修改该数值。
+#   2. 因为 CBAM 层插在第 10 层，其后所有层的编号 +1，
+#      颈部中引用 P5 的拼接层由 [..., 9] 改为 [..., 10]（见下方 21 行）。
+#   3. 文件名中的 “n” 会被 ultralytics 自动识别为 n 规模（depth 0.33 / width 0.25）。
+#   4. 使用前必须完成 CBAM 动态注册：import cbam 或见 train_cbam.py。
+
+# 数据集类别数（训练时 ultralytics 会以 data.yaml 的 nc 为准，这里写一致便于单文件推理调试）
+nc: 10
+scales: # 模型缩放系数 [depth, width, max_channels]，本文件只保留 n 规模
+  n: [0.33, 0.25, 1024]
+
+# YOLOv8.0n backbone（主干网络）
+backbone:
+  # [from, repeats, module, args]
+  - [-1, 1, Conv, [64, 3, 2]] # 0-P1/2
+  - [-1, 1, Conv, [128, 3, 2]] # 1-P2/4
+  - [-1, 3, C2f, [128, True]] # 2
+  - [-1, 1, Conv, [256, 3, 2]] # 3-P3/8
+  - [-1, 6, C2f, [256, True]] # 4
+  - [-1, 1, Conv, [512, 3, 2]] # 5-P4/16
+  - [-1, 6, C2f, [512, True]] # 6
+  - [-1, 1, Conv, [1024, 3, 2]] # 7-P5/32
+  - [-1, 3, C2f, [1024, True]] # 8
+  - [-1, 1, SPPF, [1024, 5]] # 9
+  - [-1, 1, CBAM, [256]] # 10  <-- 改进点：主干末端引入 CBAM 注意力（输入/输出通道均为 256）
+
+# YOLOv8.0n head（颈部 + 检测头）
+head:
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]] # 11
+  - [[-1, 6], 1, Concat, [1]] # 12  cat backbone P4
+  - [-1, 3, C2f, [512]] # 13
+
+  - [-1, 1, nn.Upsample, [None, 2, "nearest"]] # 14
+  - [[-1, 4], 1, Concat, [1]] # 15  cat backbone P3
+  - [-1, 3, C2f, [256]] # 16  (P3/8-small)
+
+  - [-1, 1, Conv, [256, 3, 2]] # 17
+  - [[-1, 13], 1, Concat, [1]] # 18  cat head P4
+  - [-1, 3, C2f, [512]] # 19  (P4/16-medium)
+
+  - [-1, 1, Conv, [512, 3, 2]] # 20
+  - [[-1, 10], 1, Concat, [1]] # 21  cat head P5（原为第 9 层，因插入 CBAM 顺延为第 10 层）
+  - [-1, 3, C2f, [1024]] # 22  (P5/32-large)
+
+  - [[16, 19, 22], 1, Detect, [nc]] # 23  Detect(P3, P4, P5)

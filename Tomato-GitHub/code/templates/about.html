@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+{% block title %}模型与规则说明 - 番茄病害检测与分级系统{% endblock %}
+{% block content %}
+
+<div class="text-center mb-4">
+    <h2 class="fw-bold" style="color:#2d6a4f;">模型与规则说明</h2>
+    <p class="text-muted">系统所用模型、性能指标与分级规则</p>
+</div>
+
+<!-- 模型信息 -->
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-cpu"></i> 部署模型</div>
+    <div class="card-body">
+        <div class="row">
+            <div class="col-md-6">
+                <table class="table table-borderless">
+                    <tr><th style="width:140px;">检测模型</th><td>YOLOv8s + CBAM</td></tr>
+                    <tr><th>注意力模块</th><td>CBAM（通道注意力 + 空间注意力）</td></tr>
+                    <tr><th>输入尺寸</th><td>640 × 640</td></tr>
+                    <tr><th>参数量</th><td>11.16 M</td></tr>
+                    <tr><th>计算量</th><td>28.5 GFLOPs</td></tr>
+                </table>
+            </div>
+            <div class="col-md-6">
+                <table class="table table-borderless">
+                    <tr><th style="width:140px;">mAP50</th><td><strong style="color:#2d6a4f;">0.988</strong></td></tr>
+                    <tr><th>mAP50-95</th><td><strong>0.964</strong></td></tr>
+                    <tr><th>Precision</th><td>0.986</td></tr>
+                    <tr><th>Recall</th><td>0.97</td></tr>
+                    <tr><th>推理速度</th><td>5.4 ms / 张（RTX 3050, batch=1）</td></tr>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 模型对比 -->
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-bar-chart"></i> 模型对比</div>
+    <div class="card-body">
+        <table class="table table-hover">
+            <thead style="background:#f1f8f4;">
+                <tr>
+                    <th>模型</th>
+                    <th>mAP50</th>
+                    <th>mAP50-95</th>
+                    <th>参数量(M)</th>
+                    <th>GFLOPs</th>
+                    <th>推理(ms)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td>YOLOv8n</td><td>0.9569</td><td>0.9244</td><td>3.01</td><td>8.2</td><td>2.5</td></tr>
+                <tr><td>YOLOv8n+CBAM</td><td>0.9598</td><td>0.9257</td><td>3.02</td><td>8.2</td><td>2.5</td></tr>
+                <tr style="background:#f0f9f4;"><td><strong>YOLOv8s+CBAM</strong></td><td><strong>0.988</strong></td><td><strong>0.964</strong></td><td>11.16</td><td>28.5</td><td>5.4</td></tr>
+                <tr><td>YOLOv8m+EMA</td><td>0.989</td><td>0.971</td><td>25.85</td><td>78.8</td><td>13.5</td></tr>
+            </tbody>
+        </table>
+        <p class="text-muted small mb-0">
+            <i class="bi bi-info-circle"></i>
+            综合考虑精度、参数量与推理速度，系统最终选择 YOLOv8s+CBAM 作为部署模型。
+        </p>
+    </div>
+</div>
+
+<!-- 分级规则 -->
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-diagram-3"></i> 分级规则</div>
+    <div class="card-body">
+        <h6 class="fw-bold" style="color:#2d6a4f;">方法</h6>
+        <p>在检测框内提取病征区域，计算病征覆盖率：</p>
+        <p class="text-center fw-bold">R = 病征像素数 ÷ 叶片像素数</p>
+
+        <h6 class="fw-bold mt-4" style="color:#2d6a4f;">分级阈值</h6>
+        <table class="table table-bordered text-center">
+            <thead style="background:#f1f8f4;">
+                <tr><th>等级</th><th>病征覆盖率</th><th>颜色</th></tr>
+            </thead>
+            <tbody>
+                <tr><td>轻度</td><td>R ≤ 0.10</td><td><span class="badge bg-info">蓝色</span></td></tr>
+                <tr><td>中度</td><td>0.10 &lt; R ≤ 0.30</td><td><span class="badge bg-warning text-dark">橙色</span></td></tr>
+                <tr><td>重度</td><td>R &gt; 0.30</td><td><span class="badge bg-danger">红色</span></td></tr>
+            </tbody>
+        </table>
+
+        <h6 class="fw-bold mt-4" style="color:#2d6a4f;">阈值确定依据</h6>
+        <ul>
+            <li>基于 457 张验证集样本的病征覆盖率分布直方图</li>
+            <li>自然断点法找到数据分布的天然分界点</li>
+            <li>参考植物病害调查中病斑面积占比的常用分级标准</li>
+        </ul>
+
+        <h6 class="fw-bold mt-4" style="color:#2d6a4f;">分组策略</h6>
+        <table class="table table-bordered">
+            <thead style="background:#f1f8f4;">
+                <tr><th>组别</th><th>病害类型</th><th>分级策略</th></tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td>A 组</td>
+                    <td>病斑型（早疫病、晚疫病、斑枯病、细菌性斑点病、靶斑病）</td>
+                    <td>HSV 颜色分割，计算病征覆盖率</td>
+                </tr>
+                <tr>
+                    <td>B 组</td>
+                    <td>黄化型（花叶病毒、黄化曲叶病毒）</td>
+                    <td>颜色分割不可靠，输出保守参考值</td>
+                </tr>
+                <tr>
+                    <td>Healthy</td>
+                    <td>健康叶片</td>
+                    <td>直接返回健康，不走分割</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<div class="text-center">
+    <a href="/" class="btn btn-primary px-4"><i class="bi bi-house-door"></i> 返回首页</a>
+</div>
+
+{% endblock %}

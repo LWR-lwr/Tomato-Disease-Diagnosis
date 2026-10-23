@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}检测结果 - 番茄病害检测与分级系统{% endblock %}
+{% block content %}
+
+<div class="text-center mb-4">
+    <h2 class="fw-bold" style="color:#2d6a4f;">检测结果</h2>
+</div>
+
+{% if not has_result %}
+<div class="alert alert-warning text-center">{{ message }}</div>
+{% else %}
+
+<!-- 三联图 -->
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header text-center"><i class="bi bi-image"></i> 原图</div>
+            <div class="card-body text-center">
+                <img src="{{ img_url }}" class="img-fluid rounded" style="max-height:280px; object-fit:contain;">
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header text-center"><i class="bi bi-bounding-box"></i> 检测框</div>
+            <div class="card-body text-center">
+                <img src="{{ anno_url }}" class="img-fluid rounded" style="max-height:280px; object-fit:contain;">
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-header text-center"><i class="bi bi-mask"></i> 病征掩膜</div>
+            <div class="card-body text-center">
+                {% if lesion_url %}
+                <img src="{{ lesion_url }}" class="img-fluid rounded" style="max-height:280px; object-fit:contain;">
+                {% else %}
+                <div class="text-muted py-5">
+                    <i class="bi bi-slash-circle" style="font-size:2rem;"></i>
+                    <p class="mt-2 mb-0">该类病害不输出掩膜</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 检测信息 -->
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-info-circle"></i> 检测信息</div>
+    <div class="card-body">
+        <table class="table table-borderless mb-0">
+            <tbody>
+                <tr>
+                    <th style="width: 140px;">病害类别</th>
+                    <td>
+                        <span class="text-primary fw-bold">{{ cls_cn }}</span>
+                        <small class="text-muted">（{{ cls_en }}）</small>
+                    </td>
+                </tr>
+                <tr>
+                    <th>置信度</th>
+                    <td>{{ conf }}</td>
+                </tr>
+                <tr>
+                    <th>严重程度</th>
+                    <td>
+                        <span class="badge bg-{{ sev_style }} severity-badge">{{ sev_cn }}</span>
+                    </td>
+                </tr>
+                {% if not "healthy" in cls_en.lower() and not note %}
+                <tr>
+                    <th>病征覆盖率</th>
+                    <td>
+                        {{ ratio }}
+                        <small class="text-muted">（阈值：轻度 ≤ {{ t1 }}，中度 ≤ {{ t2 }}，重度 &gt; {{ t2 }}）</small>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+        {% if note %}
+        <div class="alert alert-info mt-3 mb-0">
+            <small>{{ note }}</small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 分级色条 -->
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-sliders"></i> 严重程度指示</div>
+    <div class="card-body">
+        <div class="severity-bar">
+            <div class="severity-segment mild {% if sev == 'Mild' %}active{% endif %}">轻度</div>
+            <div class="severity-segment moderate {% if sev == 'Moderate' %}active{% endif %}">中度</div>
+            <div class="severity-segment severe {% if sev == 'Severe' %}active{% endif %}">重度</div>
+        </div>
+        {% if not "healthy" in cls_en.lower() %}
+        <div class="text-center mt-3">
+            <small class="text-muted">病征覆盖率：<strong>{{ ratio }}</strong></small>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<!-- 防治建议 -->
+{% if advice %}
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-clipboard2-pulse"></i> 防治建议</div>
+    <div class="card-body">
+        <p class="mb-0">{{ advice }}</p>
+    </div>
+</div>
+{% endif %}
+
+{% endif %}
+
+<!-- 操作按钮 -->
+<div class="text-center mt-4">
+    <a href="/" class="btn btn-primary px-4"><i class="bi bi-arrow-repeat"></i> 再测一张</a>
+    <a href="/history" class="btn btn-outline-primary px-4"><i class="bi bi-clock-history"></i> 查看历史记录</a>
+    {% if has_result and record_id %}
+    <a href="/export_pdf/{{ record_id }}" class="btn btn-success px-4"><i class="bi bi-file-earmark-pdf"></i> 下载检测报告</a>
+    {% endif %}
+</div>
+
+{% endblock %}

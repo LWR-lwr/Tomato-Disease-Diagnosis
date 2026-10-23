@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+{% block title %}数据看板 - 番茄病害检测与分级系统{% endblock %}
+{% block content %}
+
+<div class="text-center mb-4">
+    <h2 class="fw-bold" style="color:#2d6a4f;">数据看板</h2>
+    <p class="text-muted">检测数据统计与可视化</p>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-3">
+        <div class="card text-center p-4">
+            <i class="bi bi-clipboard-check" style="font-size:2rem; color:#52b788;"></i>
+            <h3 class="mt-2 fw-bold" style="color:#2d6a4f;" id="totalCount">0</h3>
+            <small class="text-muted">总检测次数</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center p-4">
+            <i class="bi bi-bug" style="font-size:2rem; color:#52b788;"></i>
+            <h3 class="mt-2 fw-bold" style="color:#2d6a4f;" id="clsCount">0</h3>
+            <small class="text-muted">病害类别数</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center p-4">
+            <i class="bi bi-exclamation-triangle" style="font-size:2rem; color:#e67e22;"></i>
+            <h3 class="mt-2 fw-bold" style="color:#e67e22;" id="sevCount">0</h3>
+            <small class="text-muted">重度病害</small>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center p-4">
+            <i class="bi bi-graph-up-arrow" style="font-size:2rem; color:#3498db;"></i>
+            <h3 class="mt-2 fw-bold" style="color:#3498db;" id="todayCount">0</h3>
+            <small class="text-muted">今日检测</small>
+        </div>
+    </div>
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-pie-chart"></i> 病害类别分布</div>
+            <div class="card-body">
+                <div id="clsChart" style="height:340px;"></div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header"><i class="bi bi-bar-chart"></i> 严重程度分布</div>
+            <div class="card-body">
+                <div id="sevChart" style="height:340px;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card mb-4">
+    <div class="card-header"><i class="bi bi-graph-up"></i> 最近 7 天检测趋势</div>
+    <div class="card-body">
+        <div id="trendChart" style="height:320px;"></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
+<script>
+fetch('/api/dashboard_data')
+    .then(res => res.json())
+    .then(data => {
+        // 顶部指标
+        document.getElementById('totalCount').textContent = data.total;
+        document.getElementById('clsCount').textContent = data.cls_data.length;
+
+        let severeCount = 0;
+        data.sev_data.forEach(item => {
+            if (item[0] === 'Severe') severeCount = item[1];
+        });
+        document.getElementById('sevCount').textContent = severeCount;
+
+        // 今日检测数
+        let todayCount = 0;
+        if (data.trend.length > 0) {
+            todayCount = data.trend[data.trend.length - 1][1];
+        }
+        document.getElementById('todayCount').textContent = todayCount;
+
+        // 类别饼图
+        const clsChart = echarts.init(document.getElementById('clsChart'));
+        clsChart.setOption({
+            tooltip: { trigger: 'item' },
+            legend: { bottom: 0, type: 'scroll' },
+            series: [{
+                type: 'pie',
+                radius: ['40%', '65%'],
+                data: data.cls_data.map(item => ({ name: item[0], value: item[1] })),
+                itemStyle: { borderRadius: 8, borderColor: '#fff', borderWidth: 2 },
+                label: { show: true, formatter: '{b}: {c}' }
+            }]
+        });
+
+        // 严重程度柱状图
+        const sevMap = { 'Healthy': '健康', 'Mild': '轻度', 'Moderate': '中度', 'Severe': '重度' };
+        const sevColor = { 'Healthy': '#2ecc71', 'Mild': '#3498db', 'Moderate': '#f39c12', 'Severe': '#e74c3c' };
+        const sevChart = echarts.init(document.getElementById('sevChart'));
+        sevChart.setOption({
+            tooltip: { trigger: 'axis' },
+            xAxis: { type: 'category', data: data.sev_data.map(item => sevMap[item[0]] || item[0]) },
+            yAxis: { type: 'value' },
+            series: [{
+                type: 'bar',
+                data: data.sev_data.map(item => ({
+                    value: item[1],
+                    itemStyle: { color: sevColor[item[0]] || '#52b788', borderRadius: [8, 8, 0, 0] }
+                })),
+                barWidth: '50%'
+            }]
+        });
+
+        // 趋势折线图
+        const trendChart = echarts.init(document.getElementById('trendChart'));
+        trendChart.setOption({
+            tooltip: { trigger: 'axis' },
+            xAxis: { type: 'category', data: data.trend.map(item => item[0]) },
+            yAxis: { type: 'value', minInterval: 1 },
+            series: [{
+                type: 'line',
+                smooth: true,
+                data: data.trend.map(item => item[1]),
+                lineStyle: { color: '#2d6a4f', width: 3 },
+                itemStyle: { color: '#2d6a4f' },
+                areaStyle: {
+                    color: {
+                        type: 'linear', x: 0, y: 0, x2: 0, y2: 1,
+                        colorStops: [
+                            { offset: 0, color: 'rgba(45,106,79,0.3)' },
+                            { offset: 1, color: 'rgba(45,106,79,0.02)' }
+                        ]
+                    }
+                }
+            }]
+        });
+
+        // 窗口大小变化自适应
+        window.addEventListener('resize', () => {
+            clsChart.resize();
+            sevChart.resize();
+            trendChart.resize();
+        });
+    })
+    .catch(err => console.error('数据加载失败:', err));
+</script>
+{% endblock %}

@@ -1,0 +1,11 @@
+# 核心依赖（未锁定版本，pip 安装时自动解析兼容版本）
+ultralytics
+flask
+opencv-python
+pyyaml
+torch
+torchvision
+numpy
+scipy
+matplotlib
+reportlab

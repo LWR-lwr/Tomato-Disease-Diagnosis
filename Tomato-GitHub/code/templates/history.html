@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}历史记录 - 番茄病害检测与分级系统{% endblock %}
+{% block content %}
+
+<div class="text-center mb-4">
+    <h2 class="fw-bold" style="color:#2d6a4f;">历史检测记录</h2>
+    <p class="text-muted">最近 50 条检测记录</p>
+</div>
+
+<div class="card">
+    <div class="card-body">
+        {% if records %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead style="background:#f1f8f4;">
+                    <tr>
+                        <th>时间</th>
+                        <th>图片</th>
+                        <th>类别</th>
+                        <th>置信度</th>
+                        <th>严重程度</th>
+                        <th>病征覆盖率</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for r in records %}
+                    <tr>
+                        <td class="text-muted small">{{ r[1] }}</td>
+                        <td><img src="{{ url_for('static', filename='uploads/' + r[2]) }}" style="height:48px; border-radius:8px;"></td>
+                        <td><span class="fw-bold" style="color:#2d6a4f;">{{ r[5] }}</span></td>
+                        <td>{{ "%.3f"|format(r[6]) }}</td>
+                        <td>
+                            {% if r[7] == "Healthy" %}<span class="badge bg-success">健康</span>
+                            {% elif r[7] == "Mild" %}<span class="badge bg-info">轻度</span>
+                            {% elif r[7] == "Moderate" %}<span class="badge bg-warning text-dark">中度</span>
+                            {% else %}<span class="badge bg-danger">重度</span>{% endif %}
+                        </td>
+                        <td>{{ "%.4f"|format(r[8]) }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-inbox" style="font-size:3rem;"></i>
+            <p class="mt-3">暂无检测记录</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="text-center mt-4">
+    <a href="/" class="btn btn-primary px-4"><i class="bi bi-house-door"></i> 返回首页</a>
+</div>
+
+{% endblock %}

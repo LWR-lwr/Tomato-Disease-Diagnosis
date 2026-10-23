@@ -1,0 +1,118 @@
+{% extends "base.html" %}
+{% block title %}批量检测 - 番茄病害检测与分级系统{% endblock %}
+{% block content %}
+
+<div class="text-center mb-4">
+    <h2 class="fw-bold" style="color:#2d6a4f;">批量检测</h2>
+    <p class="text-muted">一次上传多张图片，系统自动逐一检测</p>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body p-4">
+        {% if error %}
+        <div class="alert alert-danger">{{ error }}</div>
+        {% endif %}
+
+        <form action="/batch" method="post" enctype="multipart/form-data">
+            <div class="upload-area" id="uploadArea">
+                <i class="bi bi-images upload-icon"></i>
+                <p class="mb-2 fw-bold" style="color:#2d6a4f;">点击选择多张图片 或 拖拽到此处</p>
+                <p class="text-muted small mb-0">支持 JPG / PNG 格式，一次最多 20 张</p>
+                <input type="file" name="images" id="fileInput" accept="image/*" multiple class="d-none" required>
+                <p class="mt-3 mb-0 text-muted small" id="fileName">未选择文件</p>
+            </div>
+
+            <div class="text-center mt-4">
+                <button type="submit" class="btn btn-primary px-5">
+                    <i class="bi bi-search"></i> 开始批量检测
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{% if results %}
+<div class="card">
+    <div class="card-header"><i class="bi bi-list-check"></i> 检测结果（共 {{ results|length }} 张）</div>
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead style="background:#f1f8f4;">
+                    <tr>
+                        <th style="width:80px;">图片</th>
+                        <th>文件名</th>
+                        <th>病害类别</th>
+                        <th>置信度</th>
+                        <th>严重程度</th>
+                        <th>病征覆盖率</th>
+                        <th>防治建议</th>
+                    </tr>
+                </thead>
+                <tbody>
+                {% for r in results %}
+                    <tr>
+                        <td>
+                            {% if r.image_url %}
+                            <img src="{{ r.image_url }}" style="height:56px; border-radius:8px;">
+                            {% endif %}
+                        </td>
+                        <td class="small text-muted">{{ r.filename }}</td>
+                        <td>
+                            {% if r.error %}
+                            <span class="text-danger">{{ r.error }}</span>
+                            {% else %}
+                            <span class="fw-bold" style="color:#2d6a4f;">{{ r.cls_cn }}</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ r.conf }}</td>
+                        <td>
+                            {% if r.sev_style %}
+                            <span class="badge bg-{{ r.sev_style }}">{{ r.sev_cn }}</span>
+                            {% else %}-{% endif %}
+                        </td>
+                        <td>{{ r.ratio }}</td>
+                        <td class="small" style="max-width:300px;">{{ r.advice }}</td>
+                    </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+const uploadArea = document.getElementById('uploadArea');
+const fileInput = document.getElementById('fileInput');
+const fileName = document.getElementById('fileName');
+
+uploadArea.addEventListener('click', () => fileInput.click());
+
+uploadArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    uploadArea.classList.add('dragover');
+});
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('dragover'));
+uploadArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    uploadArea.classList.remove('dragover');
+    if (e.dataTransfer.files.length > 0) {
+        fileInput.files = e.dataTransfer.files;
+        updateFileName();
+    }
+});
+
+fileInput.addEventListener('change', updateFileName);
+
+function updateFileName() {
+    if (fileInput.files.length > 0) {
+        fileName.textContent = '已选择 ' + fileInput.files.length + ' 张图片';
+    } else {
+        fileName.textContent = '未选择文件';
+    }
+}
+</script>
+{% endblock %}
