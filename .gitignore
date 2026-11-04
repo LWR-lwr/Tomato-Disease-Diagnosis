@@ -1,0 +1,29 @@
+# 训练与运行产物
+datasets/
+runs/
+outputs/
+logs/
+*.pt
+*.pth
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# 运行时上传与结果（本地运行时生成）
+code/static/uploads/
+code/static/results/
+code/static/reports/
+
+# 系统与编辑器
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

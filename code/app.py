@@ -16,13 +16,25 @@ from services.report import generate_report
 
 app = Flask(__name__)
 
-MODEL_PATH = r"D:\python\TomatoDiseaseProject\runs\detect\runs\detect\cbam_s\weights\best.pt"
+# 模型权重路径：优先使用环境变量 TOMATO_MODEL_PATH，其次查找项目内的 weights 目录，最后回退到旧默认路径。
+# 将权重文件 best.pt 放在 code/weights/best.pt 即可，无需修改代码。
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DEFAULT_MODEL_PATH = os.path.join(BASE_DIR, "weights", "best.pt")
+MODEL_PATH = os.environ.get("TOMATO_MODEL_PATH", DEFAULT_MODEL_PATH)
+
 UPLOAD_DIR = os.path.join("static", "uploads")
 RESULT_DIR = os.path.join("static", "results")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(RESULT_DIR, exist_ok=True)
 
 init_db()
+
+if not os.path.exists(MODEL_PATH):
+    print(f"[启动失败] 未找到模型权重文件: {MODEL_PATH}")
+    print("请将训练好的 best.pt 放入 code/weights/ 目录，")
+    print("或通过环境变量 TOMATO_MODEL_PATH 指定权重文件路径。")
+    sys.exit(1)
+
 model = load_cbam_model(MODEL_PATH)
 
 CLASS_CN = {
