@@ -1,91 +1,105 @@
-# 基于改进 YOLOv8 的番茄叶片病害智能诊断与分级系统
+# Tomato-Disease-Diagnosis
 
-本科毕业设计作品。基于改进 YOLOv8 的番茄叶片病害检测模型，配合 HSV 色彩空间的病害严重程度分级算法，封装为 Flask 全栈 Web 应用，支持图像上传、病害识别、严重程度分级、防治建议与 PDF 报告导出。
+**An improved YOLOv8 framework for tomato leaf disease detection and severity grading**
 
-> 完整覆盖「模型改进 → 对比实验 → 分级算法 → 工程落地」全流程。
-
----
-
-## ✨ Research Highlights
-
-- **注意力机制在小模型上的有效性得到验证**：在 YOLOv8n 基线中引入 EMA 注意力，mAP50-95 由 0.9242 提升至 **0.9520（+2.78%）**。
-- **发现「模型容量饱和」的负结果**：YOLOv8s 上叠加 CBAM / EMA / ECA / SimAM / CA 后，mAP50-95 均在 0.9637–0.9648，**普遍低于 s 基线 0.9673**，说明中等规模模型已接近该数据集的表现上限。
-- **针对数据标注粗糙问题设计了 A/B 分组分级策略**：将「病斑型」与「黄化型」病害分开处理，病斑型走 HSV 颜色分割，黄化型（颜色特征不显著）输出保守参考值，避免用不可靠的分割结果硬算严重度。
-- **结果可复现、可落地**：所有注意力模块通过动态注册方式接入 Ultralytics，不改动框架源码；训练、排队、校准脚本齐全。
+A single pipeline that goes from a raw leaf photograph to a disease label, a severity grade, a treatment recommendation, and a PDF report — spanning model comparison, a hand-designed grading algorithm, and a deployed Flask application.
 
 ---
 
-## 📊 核心实验结果
+## Research Highlights
 
-| 模型 | 注意力 | mAP50-95 | 相对基线 |
-| --- | --- | --- | --- |
-| YOLOv8n | 基线 | 0.9242 | — |
-| YOLOv8n | **+EMA** | **0.9520** | **+2.78%** |
-| YOLOv8s | 基线 | **0.9673** | — |
-| YOLOv8s | +CBAM / +EMA / +ECA / +SimAM / +CA | 0.9637–0.9648 | ↓（低于基线） |
-| YOLOv5s | 基线 | 0.9640 | 对比参照 |
+- **Attention helps small models but saturates on mid-sized ones.** Adding an EMA attention block to YOLOv8n raised mAP50-95 from 0.9242 to **0.9520 (+2.78%)**. Applying the same family of modules — CBAM, EMA, ECA, SimAM, and CA — to YOLOv8s produced *no* gain: all five landed between 0.9637 and 0.9648, below the 0.9673 baseline. This negative result is reported as-is rather than tuned away.
+- **Coarse annotations break box-area grading, so the grading problem was reformulated.** Because bounding boxes in the dataset are drawn loosely around whole leaves, lesion area cannot be read off box ratios. We split diseases into two groups: lesion-type diseases are graded by HSV colour segmentation inside the detected leaf, while chlorosis-type diseases — whose colour signature is not discriminative — return a conservative reference value instead of a spurious measurement.
+- **A complete, runnable system rather than a model checkpoint.** Detection, grading, history browsing, an ECharts dashboard, and PDF report export are all wired together and were validated end-to-end on held-out images.
 
 ---
 
-## 🖼 系统界面
+## System Overview
 
-**首页（拖拽上传）**
+<p align="center">
+  <img src="images/ui.png" width="720" alt="Upload interface">
+</p>
 
-![系统主界面](images/ui.png)
+<p align="center"><em>Figure 1. Upload interface of the diagnostic system.</em></p>
 
-**检测结果示例**（早疫病，置信度 0.94）：左为原图，中为检测框标注，右为病斑掩膜（红色为病征区域）。
+### Detection and grading output
 
-| 原图 | 检测标注 | 病斑分割 |
-| --- | --- | --- |
-| ![原图](images/detect_original.jpg) | ![检测框](images/detect_anno.jpg) | ![病斑掩膜](images/detect_lesion.jpg) |
+A single inference returns three aligned views — the original crop, the detected lesion with its class and confidence, and the segmented lesion mask used to compute the severity ratio.
 
-**数据看板（ECharts）**
+| Original | Detection | Lesion mask |
+| :--: | :--: | :--: |
+| <img src="images/detect_original.jpg" width="220"> | <img src="images/detect_anno.jpg" width="220"> | <img src="images/detect_lesion.jpg" width="220"> |
 
-![数据看板](images/dashboard.png)
+<p align="center"><em>Figure 2. Early blight, confidence 0.94. The mask (right) drives the severity ratio.</em></p>
 
-**历史记录**
+### Dashboard and history
 
-![历史记录](images/history.png)
+<p align="center">
+  <img src="images/dashboard.png" width="720" alt="ECharts dashboard">
+</p>
 
----
+<p align="center"><em>Figure 3. Detection dashboard: class distribution, severity distribution, and a 7-day trend.</em></p>
 
-## 🧠 病害严重程度分级算法
+<p align="center">
+  <img src="images/history.png" width="720" alt="Detection history">
+</p>
 
-检测框面积比在粗糙标注下不可靠，故采用 **A/B 分组**策略（`grade_severity.py`）：
-
-- **B 组（黄化/花叶病毒）**：颜色分割不可靠，直接输出 ratio=0.15（Moderate 保守参考值），并明确标注为参考结果。
-- **Healthy**：直接返回 ratio=0.0，不参与分割。
-- **A 组（病斑型）**：基于 HSV 色彩空间，在叶片 ROI 内提取绿色健康区，其余非绿区视为病斑，计算 `病斑面积 / 叶片面积` 作为覆盖率 ratio。
-
-分级阈值：`ratio ≤ 0.10` 轻度，`0.10 < ratio ≤ 0.30` 中度，`ratio > 0.30` 重度。
-
-> 该分级规则为本系统的工程化分级规则，不代表农业病害领域的统一标准。
+<p align="center"><em>Figure 4. Persistent detection history backed by SQLite.</em></p>
 
 ---
 
-## 🚀 快速开始
+## Experimental Results
 
-### 1. 环境要求
+All detection experiments were run on a single RTX 3050 (8 GB) with Ultralytics 8.4.147 and PyTorch 2.6.0. Attention modules are registered dynamically into `ultralytics.nn.tasks` — no framework source is modified.
 
-- Python 3.10+（建议 3.10 / 3.11 以获得完整 PyTorch 支持）
-- 推理建议使用 NVIDIA GPU（CUDA 环境）
+| Backbone | Attention | mAP50-95 | Δ vs. baseline |
+| :-- | :-- | --: | :-- |
+| YOLOv8n | — | 0.9242 | — |
+| YOLOv8n | **EMA** | **0.9520** | **+2.78%** |
+| YOLOv8s | — | **0.9673** | — |
+| YOLOv8s | CBAM / EMA / ECA / SimAM / CA | 0.9637 – 0.9648 | negative |
+| YOLOv5s | — | 0.9640 | reference |
 
-### 2. 安装依赖
+**Interpretation.** The n-scale model has spare capacity, so a well-placed attention block yields a clear gain. At the s-scale the baseline already sits near the ceiling this dataset supports; every variant tested fell slightly below it. The takeaway is not that attention is ineffective, but that its benefit is capacity-dependent — which is why the final deployed model uses the n-scale backbone with EMA.
+
+A segmentation branch (YOLOv8s-seg) was also trained on a merged AgriVision + PlantSeg set. It plateaued at mAP50 ≈ 0.588 because the two sources differ sharply in background, lighting, and annotation standard, and one class is severely under-represented. Rather than continue tuning, the segmentation model was kept as a comparison arm and the HSV approach was adopted for grading.
+
+---
+
+## Method: Severity Grading
+
+Bounding-box area ratios are unreliable under coarse annotation, so grading is handled by an A/B split (`code/grade_severity.py`):
+
+- **Group A — lesion-type diseases.** Within the detected leaf ROI, healthy tissue is extracted in HSV space; everything else is treated as lesion. The severity ratio is `lesion area / leaf area`.
+- **Group B — chlorosis-type diseases** (mosaic virus, yellow leaf curl). Colour segmentation is not discriminative for these, so the system returns a conservative reference ratio and labels the output as advisory.
+- **Healthy.** Ratio fixed at 0.0; segmentation is skipped entirely.
+
+Grade thresholds: `ratio ≤ 0.10` mild, `0.10 < ratio ≤ 0.30` moderate, `ratio > 0.30` severe.
+
+> These thresholds are an engineering rule set calibrated for this system. They are not an agronomic standard.
+
+---
+
+## Reproducing
+
+### 1. Environment
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. 准备模型权重
+Python 3.10+ recommended. A CUDA-capable GPU is advised for training, not required for inference.
 
-本仓库不包含训练权重（`*.pt` 已由 `.gitignore` 排除）。将训练好的权重文件放入 `code/weights/best.pt`：
+### 2. Model weights
+
+Weights are excluded from the repository (`*.pt` is git-ignored). Place the trained checkpoint at `code/weights/best.pt`:
 
 ```bash
 mkdir -p code/weights
-# 将 best.pt 复制到 code/weights/ 下
+# copy best.pt into code/weights/
 ```
 
-也可通过环境变量指定权重路径：
+Or point to it explicitly:
 
 ```bash
 # Windows
@@ -94,49 +108,52 @@ set TOMATO_MODEL_PATH=D:\path\to\best.pt
 export TOMATO_MODEL_PATH=/path/to/best.pt
 ```
 
-### 4. 启动系统
+### 3. Run
 
 ```bash
 cd code
 python app.py
 ```
 
-浏览器访问 <http://127.0.0.1:5000>。
+Then open <http://127.0.0.1:5000>.
+
+### 4. Retrain
+
+`code/train_task.py` is the general entry point; `code/run_queue.py` replays the full experiment queue serially and writes logs to `logs/`.
+
+```bash
+python code/train_task.py --task ema --model yolov8n --data datasets/tomato/data.yaml --name ema_n
+```
 
 ---
 
-## 📁 项目结构
+## Repository Structure
 
 ```
 code/
-├── modules/              # 注意力模块（CBAM / EMA / ECA / SimAM / CA）
+├── modules/              # Attention modules: CBAM, EMA, ECA, SimAM, CA
 ├── services/
-│   ├── database.py       # SQLite 持久化（检测记录）
-│   ├── report.py         # ReportLab 生成 PDF 报告
-│   └── treatment.py      # 防治建议字典
-├── templates/            # Bootstrap 5 前端页面
-├── app.py                # Flask 入口
-├── grade_severity.py     # A/B 分组严重程度分级算法
-├── train_task.py         # 通用训练脚本（动态注入注意力模块）
-├── run_queue.py          # 自动化排队训练脚本
-└── *.yaml                # 各模型/注意力组合的配置
+│   ├── database.py       # SQLite persistence for detection records
+│   ├── report.py         # PDF report generation (ReportLab)
+│   └── treatment.py      # Treatment recommendation lookup
+├── templates/            # Bootstrap 5 front-end pages
+├── app.py                # Flask entry point
+├── grade_severity.py     # A/B severity grading algorithm
+├── train_task.py         # General training entry point
+├── run_queue.py          # Serial experiment queue
+└── *.yaml                # Backbone + attention configurations
 ```
 
 ---
 
-## 📚 技术栈
+## Stack
 
-| 层 | 技术 |
-| --- | --- |
-| 后端 | Flask |
-| 模型 | Ultralytics YOLOv8（PyTorch） |
-| 图像处理 | OpenCV / NumPy / SciPy |
-| 报告生成 | ReportLab |
-| 数据存储 | SQLite |
-| 前端 | Bootstrap 5 / ECharts |
+`PyTorch` · `Ultralytics YOLOv8` · `OpenCV` · `NumPy` · `SciPy` · `Flask` · `SQLite` · `ReportLab` · `Bootstrap 5` · `ECharts`
 
 ---
 
-## 📄 声明
+## Note
 
-本项目为个人毕业设计作品，代码仅供学习与交流使用。
+Undergraduate thesis project. Code is shared for learning and reference.
+
+Datasets, training runs, checkpoints, and the SQLite database are git-ignored and not distributed with this repository.

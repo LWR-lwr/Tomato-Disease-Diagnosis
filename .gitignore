@@ -9,6 +9,17 @@ logs/
 *.sqlite
 *.sqlite3
 
+# 压缩包与归档（数据集/权重不得入库）
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+*.onnx
+*.engine
+*.torchscript
+
 # Python
 __pycache__/
 *.py[cod]
