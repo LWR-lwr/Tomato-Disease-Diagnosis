@@ -1,5 +1,7 @@
 # Tomato-Disease-Diagnosis
 
+> 中文文档：[README.zh-CN.md](README.zh-CN.md) · Undergraduate thesis project, 2027.
+
 **An improved YOLOv8 framework for tomato leaf disease detection and severity grading**
 
 A single pipeline that goes from a raw leaf photograph to a disease label, a severity grade, a treatment recommendation, and a PDF report — spanning model comparison, a hand-designed grading algorithm, and a deployed Flask application.
@@ -8,7 +10,7 @@ A single pipeline that goes from a raw leaf photograph to a disease label, a sev
 
 ## Research Highlights
 
-- **Attention helps small models but saturates on mid-sized ones.** Adding an EMA attention block to YOLOv8n raised mAP50-95 from 0.9242 to **0.9520 (+2.78%)**. Applying the same family of modules — CBAM, EMA, ECA, SimAM, and CA — to YOLOv8s produced *no* gain: all five landed between 0.9637 and 0.9648, below the 0.9673 baseline. This negative result is reported as-is rather than tuned away.
+- **Attention helps small models but saturates on mid-sized ones.** Adding an EMA attention block to YOLOv8n raised mAP50-95 from 0.9242 to **0.9520 (absolute +0.0278)**. Applying the same family of modules — CBAM, EMA, ECA, SimAM, and CA — to YOLOv8s produced *no* gain: all five landed between 0.9637 and 0.9648, below the 0.9673 baseline. This negative result is reported as-is rather than tuned away.
 - **Coarse annotations break box-area grading, so the grading problem was reformulated.** Because bounding boxes in the dataset are drawn loosely around whole leaves, lesion area cannot be read off box ratios. We split diseases into two groups: lesion-type diseases are graded by HSV colour segmentation inside the detected leaf, while chlorosis-type diseases — whose colour signature is not discriminative — return a conservative reference value instead of a spurious measurement.
 - **A complete, runnable system rather than a model checkpoint.** Detection, grading, history browsing, an ECharts dashboard, and PDF report export are all wired together and were validated end-to-end on held-out images.
 
@@ -58,11 +60,11 @@ All detection experiments were run on a single RTX 3050 (8 GB) with Ultralytics 
 | YOLOv8n | **EMA** | **0.9520** | **+2.78%** |
 | YOLOv8s | — | **0.9673** | — |
 | YOLOv8s | CBAM / EMA / ECA / SimAM / CA | 0.9637 – 0.9648 | negative |
-| YOLOv5s | — | 0.9640 | reference |
+| YOLOv5s | — | 0.9636 | reference |
 
-**Interpretation.** The n-scale model has spare capacity, so a well-placed attention block yields a clear gain. At the s-scale the baseline already sits near the ceiling this dataset supports; every variant tested fell slightly below it. The takeaway is not that attention is ineffective, but that its benefit is capacity-dependent — which is why the final deployed model uses the n-scale backbone with EMA.
+**Interpretation.** The n-scale model has spare capacity, so a well-placed attention block yields a clear gain. At the s-scale the baseline already sits near the ceiling this dataset supports; every variant tested fell slightly below it. The takeaway is not that attention is ineffective, but that its benefit is capacity-dependent. The deployed Web system is a separate engineering decision: it loads the `cbam_s` checkpoint (YOLOv8s + CBAM), selected for localisation quality (mAP50-95 0.9673 vs. 0.9636 for YOLOv5s), Anchor-Free extensibility and response latency — not for the best single mAP figure.
 
-A segmentation branch (YOLOv8s-seg) was also trained on a merged AgriVision + PlantSeg set. It plateaued at mAP50 ≈ 0.588 because the two sources differ sharply in background, lighting, and annotation standard, and one class is severely under-represented. Rather than continue tuning, the segmentation model was kept as a comparison arm and the HSV approach was adopted for grading.
+A segmentation branch (YOLOv8s-seg) was also trained on a merged AgriVision + PlantSeg set. Its mAP50 rose only from 0.5723 to 0.6097 over 187 epochs because the two sources differ sharply in background, lighting, and annotation standard, and one class is severely under-represented. Rather than continue tuning, the segmentation model was kept as a comparison arm and the HSV approach was adopted for grading.
 
 ---
 
@@ -76,7 +78,24 @@ Bounding-box area ratios are unreliable under coarse annotation, so grading is h
 
 Grade thresholds: `ratio ≤ 0.10` mild, `0.10 < ratio ≤ 0.30` moderate, `ratio > 0.30` severe.
 
-> These thresholds are an engineering rule set calibrated for this system. They are not an agronomic standard.
+> These thresholds are an engineering rule set calibrated for this system. They are not an agronomic standard. They remain **unchanged** in the running system; the recalibrated values in the next section are exploratory only.
+
+
+---
+
+## Human-Annotated Validation (98 samples)
+
+The thresholds above were calibrated from the coverage-ratio distribution, not from human judgement. To quantify the gap, 100 lesion-type validation images were drawn by stratified sampling (fixed seed `20261110`) and graded independently by a human annotator; 2 ambiguous images were excluded, leaving **98 valid samples** (51 mild / 32 moderate / 15 severe).
+
+| Setting | T1 / T2 | Agreement | Cohen's κ |
+| :-- | :-- | --: | --: |
+| Running system (unchanged) | 0.10 / 0.30 | **56.12%** (55/98) | 0.3400 |
+| Recalibrated on annotations | 0.23 / 0.38 | 73.47% | 0.5551 |
+| 5-fold cross-validation (held-out folds) | — | 66.21% | 0.4445 |
+
+Confusion matrix (rows = human, columns = system): 27/20/4 (mild), 6/13/13 (moderate), 0/0/15 (severe). The system **systematically overestimates severity**: 24 of 51 mild samples were graded moderate or severe, while all 15 severe samples were recognised. The main cause is that the HSV "non-green" mask also counts veins, chlorotic leaf margins, specular highlights and residual background as lesion area.
+
+Recalibration is an **exploratory analysis** — 98 samples and no independent validation set. The running system therefore still uses `T1 = 0.10 / T2 = 0.30`; a production threshold change would require a larger annotation set, multiple independent annotators and a held-out evaluation. Full data are in the thesis, Section 4.5.1 (Tables 4-3 and 4-4).
 
 ---
 
@@ -88,7 +107,7 @@ Grade thresholds: `ratio ≤ 0.10` mild, `0.10 < ratio ≤ 0.30` moderate, `rati
 pip install -r requirements.txt
 ```
 
-Python 3.10+ recommended. A CUDA-capable GPU is advised for training, not required for inference.
+Verified on Windows 11 / Python 3.12.14 / PyTorch 2.6.0+cu124 / Ultralytics 8.4.147 with an RTX 3050 (8 GB). A CUDA-capable GPU is advised for training, not required for inference.
 
 ### 2. Model weights
 
@@ -122,7 +141,7 @@ Then open <http://127.0.0.1:5000>.
 `code/train_task.py` is the general entry point; `code/run_queue.py` replays the full experiment queue serially and writes logs to `logs/`.
 
 ```bash
-python code/train_task.py --task ema --model yolov8n --data datasets/tomato/data.yaml --name ema_n
+python code/train_task.py --task detect --model yolov8s_cbam.yaml --data datasets/tomato/data.yaml --name cbam_s --epochs 100
 ```
 
 ---
@@ -154,6 +173,6 @@ code/
 
 ## Note
 
-Undergraduate thesis project. Code is shared for learning and reference.
+Undergraduate thesis project. Code is shared for learning and reference. The final thesis (45 pages, 23 figures, 8 tables, 19 references), the 100-image annotation set and the agreement / recalibration analyses are **not distributed with this repository**; only the verified numbers are summarised above. All results are reproducible from the training logs and the annotation CSV.
 
 Datasets, training runs, checkpoints, and the SQLite database are git-ignored and not distributed with this repository.
