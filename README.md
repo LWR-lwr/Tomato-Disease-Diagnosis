@@ -173,6 +173,6 @@ code/
 
 ## Note
 
-Undergraduate thesis project. Code is shared for learning and reference. The final thesis (45 pages, 23 figures, 8 tables, 19 references), the 100-image annotation set and the agreement / recalibration analyses are **not distributed with this repository**; only the verified numbers are summarised above. All results are reproducible from the training logs and the annotation CSV.
+Undergraduate thesis project. Code is shared for learning and reference. The final thesis (45 pages, 23 figures, 9 tables, 23 references), the 100-image annotation set and the agreement / recalibration analyses are **not distributed with this repository**; only the verified numbers are summarised above. All results are reproducible from the training logs and the annotation CSV.
 
 Datasets, training runs, checkpoints, and the SQLite database are git-ignored and not distributed with this repository.

@@ -4,7 +4,7 @@
 并基于 Flask + SQLite 实现可运行的 Web 诊断系统，覆盖图片上传、单图与批量检测、严重程度分级、
 历史留痕、ECharts 数据看板与 PDF 报告导出。
 
-> 英文版见 [README.md](README.md)。配套本科毕业论文定稿（45 页、23 图、8 表、19 篇参考文献）未随仓库分发。
+> 英文版见 [README.md](README.md)。配套本科毕业论文定稿（45 页、23 图、9 表、23 篇参考文献）未随仓库分发。
 > 本 README 的分级口径、实验指标与阈值均与论文第 4 章保持一致。
 
 ## 功能特性
@@ -59,7 +59,7 @@ Tomato-GitHub/
 │   ├── cbam.py             # 动态注册 + load_cbam_model
 │   ├── grade_severity.py   # HSV A/B 分组分级
 │   ├── train_task.py       # 通用训练脚本
-│   ├── run_queue.py        # 11 组任务串行调度
+│   ├── run_queue.py        # 队列 11 项训练任务串行调度
 │   ├── ratio_distribution.py / sample_calibration.py
 │   └── yolov8*.yaml        # 各改进模型配置
 ├── images/                 # 系统真实运行截图
@@ -112,7 +112,7 @@ python train_task.py --task detect --model yolov8s_cbam.yaml \
   --data /path/to/data.yaml --name cbam_s --epochs 100
 ```
 
-11 组任务的完整调度顺序见 `run_queue.py`。
+队列 11 项任务（含 4 项分割）的完整调度顺序见 `run_queue.py`；检测对比另含单独补跑的对照组，论文中合计 13 组。
 
 ## 界面预览
 
@@ -130,7 +130,7 @@ python train_task.py --task detect --model yolov8s_cbam.yaml \
 
 - 分级属于**面向本课题数据集的工程化近似**，不代表农业领域统一标准。与人工判读存在系统性高估，原因是 HSV "非绿区"会把叶脉、枯黄叶缘、高光反光与残留背景计入病斑；详见论文 4.5.1 节与表 4-3、表 4-4。
 - 阈值重标定基于 98 张样本且无独立验证集，属探索性分析，**线上仍使用 T1=0.10 / T2=0.30**。
-- 数据看板的 113 条记录来自系统试运行，图表用于验证聚合查询与可视化链路的正确性，不作为病害发生规律的统计结论。
+- 数据看板的 113 条记录（库内当前 114 条）来自系统试运行，图表用于验证聚合查询与可视化链路的正确性，不作为病害发生规律的统计结论。
 - 训练与运行产物（数据集、权重、日志、数据库）不入库。
 
 ## 声明

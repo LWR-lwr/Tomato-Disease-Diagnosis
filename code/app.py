@@ -16,25 +16,26 @@ from services.report import generate_report
 
 app = Flask(__name__)
 
-# 模型权重路径：优先使用环境变量 TOMATO_MODEL_PATH，其次查找项目内的 weights 目录，最后回退到旧默认路径。
-# 将权重文件 best.pt 放在 code/weights/best.pt 即可，无需修改代码。
+# 模型权重查找顺序：环境变量 TOMATO_MODEL_PATH > code/weights/best.pt > 原训练输出路径
+# 迁移到新机时把 best.pt 放到 code/weights/ 即可，无需改代码
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_MODEL_PATH = os.path.join(BASE_DIR, "weights", "best.pt")
-MODEL_PATH = os.environ.get("TOMATO_MODEL_PATH", DEFAULT_MODEL_PATH)
-
+LEGACY_MODEL_PATH = r"D:\python\TomatoDiseaseProject\runs\detect\runs\detect\cbam_s\weights\best.pt"
+MODEL_PATH = os.getenv("TOMATO_MODEL_PATH", DEFAULT_MODEL_PATH)
+if not os.path.isfile(MODEL_PATH) and os.path.isfile(LEGACY_MODEL_PATH):
+    MODEL_PATH = LEGACY_MODEL_PATH
+if not os.path.isfile(MODEL_PATH):
+    raise FileNotFoundError(
+        f"未找到模型权重：{MODEL_PATH}\n"
+        "请把 best.pt 放到 code/weights/best.pt，"
+        "或设置环境变量 TOMATO_MODEL_PATH 指向权重文件后重新启动。"
+    )
 UPLOAD_DIR = os.path.join("static", "uploads")
 RESULT_DIR = os.path.join("static", "results")
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 os.makedirs(RESULT_DIR, exist_ok=True)
 
 init_db()
-
-if not os.path.exists(MODEL_PATH):
-    print(f"[启动失败] 未找到模型权重文件: {MODEL_PATH}")
-    print("请将训练好的 best.pt 放入 code/weights/ 目录，")
-    print("或通过环境变量 TOMATO_MODEL_PATH 指定权重文件路径。")
-    sys.exit(1)
-
 model = load_cbam_model(MODEL_PATH)
 
 CLASS_CN = {
@@ -69,11 +70,17 @@ def detect():
     up_path = os.path.join(UPLOAD_DIR, fname)
     f.save(up_path)
 
-    img = cv2.imread(up_path)
+    try:
+        img = cv2.imread(up_path)
+    except Exception:
+        img = None
     if img is None:
-        return render_template("index.html", error="图片读取失败", active="home")
+        return render_template("index.html", error="图片读取失败，请确认文件为有效图像", active="home")
 
-    result = grade_severity(model, img)
+    try:
+        result = grade_severity(model, img)
+    except Exception:
+        return render_template("index.html", error="推理过程出现异常，请更换图片后重试", active="home")
 
     if result.get("status") == "no_detection":
         return render_template("result.html",
@@ -173,12 +180,19 @@ def batch():
         up_path = os.path.join(UPLOAD_DIR, fname)
         f.save(up_path)
 
-        img = cv2.imread(up_path)
+        try:
+            img = cv2.imread(up_path)
+        except Exception:
+            img = None
         if img is None:
-            results.append({"filename": f.filename, "error": "图片读取失败"})
+            results.append({"filename": f.filename, "error": "图片读取失败，请确认文件为有效图像"})
             continue
 
-        result = grade_severity(model, img)
+        try:
+            result = grade_severity(model, img)
+        except Exception:
+            results.append({"filename": f.filename, "error": "推理异常，已跳过该文件"})
+            continue
 
         if result.get("status") == "no_detection":
             results.append({

@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from scipy import ndimage
 
-# ===== 分级阈值（已校准） =====
+# ===== 分级阈值（按覆盖率分布经验分界设定，未按人工真值校准） =====
 T1 = 0.10
 T2 = 0.30
 
